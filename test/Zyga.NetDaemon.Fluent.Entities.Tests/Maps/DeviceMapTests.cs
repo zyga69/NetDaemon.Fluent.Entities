@@ -8,6 +8,7 @@ namespace NetDaemon.Fluent.Entities.Tests.Maps
     {
         public required int Sensor { get; set; }
         public required DateTime DateTime { get; set; }
+        public bool? BinarySensor { get; set; }
     }
 
     public class TestMap : DeviceMap<TestDevice>
@@ -229,6 +230,31 @@ namespace NetDaemon.Fluent.Entities.Tests.Maps
 
             Assert.Equal(tempSensorFriendlyName, tempSensor.FriendlyName);
             Assert.Equal(DeviceClass.Timestamp.GetDescription(), tempSensor.DeviceClass);
+        }
+
+        [Fact]
+        public void Sensor_BinarySensor()
+        {
+            string tempSensorFriendlyName = StringHelpers.Random();
+            string binarySensorPrefix = "binary_sensor";
+
+            var sensorMap = new TestMap();
+            sensorMap.InitDevice();
+
+            string tempSensorName = $"{binarySensorPrefix}.{sensorMap.Definition.Identifier}_{StringHelpers.Random()}";
+
+            sensorMap.Map(x => x.BinarySensor, tempSensorName)
+                .WithFriendlyName(tempSensorFriendlyName)
+                .AsBinarySensor();
+
+            var definition = sensorMap.Definition;
+
+            Assert.Single(definition.Sensors);
+
+            var binarySensor = definition.Sensors.Single();
+            Assert.Equal(tempSensorName, binarySensor.EntityId);
+            Assert.StartsWith(binarySensorPrefix, binarySensor.EntityId);
+            Assert.Equal(tempSensorFriendlyName, binarySensor.FriendlyName);
         }
     }
 }
