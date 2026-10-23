@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Microsoft.Testing.Platform, not VSTest. OutputType=Exe makes this a
+    self-executing MTP app; the opt-in that lets `dotnet test` drive it lives in
+    global.json.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <!-- Matches the InternalsVisibleTo target in AssemblyInfo.cs (namespace is unprefixed; see Directory.Build.props notes on the Zyga.NetDaemon namespace collision). -->
+    <AssemblyName>NetDaemon.Fluent.Entities.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.Reactive.Testing" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Zyga.NetDaemon.Fluent.Entities\Zyga.NetDaemon.Fluent.Entities.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Zyga.NetDaemon.Fluent.Entities</PackageId>
+    <RootNamespace>NetDaemon.Fluent.Entities</RootNamespace>
+    <Description>An unofficial, community-maintained fluent device/entity mapping framework for NetDaemon apps. Not affiliated with the NetDaemon project.</Description>
+    <PackageTags>netdaemon;home-assistant;mqtt;fluent</PackageTags>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" PrivateAssets="all" />
+    <PackageReference Include="Material.Icons" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="NetDaemon.Extensions.Mqtt" />
+    <PackageReference Include="NetDaemon.HassModel" />
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+
+</Project>
