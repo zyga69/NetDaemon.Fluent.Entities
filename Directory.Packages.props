@@ -1,0 +1,39 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    Versions drift, and this file is not exempt. Verified against nuget.org on
+    2026-10-23 against SDK 10.0.100, single-targeted net10.0, with
+    TreatWarningsAsErrors on. Let Dependabot keep these moving.
+  -->
+  <ItemGroup Label="Build">
+    <PackageVersion Include="MinVer" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Runtime">
+    <PackageVersion Include="Material.Icons" Version="3.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="NetDaemon.Extensions.Mqtt" Version="26.36.0" />
+    <PackageVersion Include="NetDaemon.HassModel" Version="26.36.0" />
+    <PackageVersion Include="Serilog" Version="4.4.0" />
+  </ItemGroup>
+
+  <!--
+    Microsoft.Testing.Platform stack. Microsoft.NET.Test.Sdk,
+    xunit.runner.visualstudio and coverlet.collector are deliberately absent — that
+    VSTest combination fails the build on the .NET 10 SDK.
+  -->
+  <ItemGroup Label="Test">
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.5.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="Microsoft.Reactive.Testing" Version="7.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+  </ItemGroup>
+
+</Project>
