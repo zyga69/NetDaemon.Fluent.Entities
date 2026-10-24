@@ -22,6 +22,11 @@ dotnet add package Zyga.NetDaemon.Fluent.Entities
 Targets .NET 10 only — this follows from `NetDaemon.HassModel`/`NetDaemon.Extensions.Mqtt` (the APIs this
 library sits on top of), which ship `net10.0` builds only.
 
+A complete, runnable example lives in [`samples/NetDaemon.Fluent.Entities.Sample`](samples/NetDaemon.Fluent.Entities.Sample) —
+one device model mapping every entity kind the library supports (sensor, binary sensor, switch,
+temperature sensor, timestamp sensor, button, template sensor), built and compile-checked by CI on every
+push. Point its `appsettings.json` at a real HA/MQTT instance to run it.
+
 ## The moving parts, at a glance
 
 - A **device model** is a plain class (e.g. `Tank`) whose properties/methods compute the values you want to
@@ -63,7 +68,8 @@ public class TankMap : DeviceMap<Model.Tank>
 
 `AsDevice(identifier)` registers a single instance of `TDevice`. When several instances of the *same*
 device model type need to exist side by side, use the keyed overload, `AsDevice(identifier, key)`, and
-differentiate them later with `IDeviceRegistry.GetKeyed`/`IDeviceService.InitFromMap`/`IDeviceService.UpdateKeyed`:
+address each instance afterwards through the `*Keyed` members of `IDeviceService` — see the
+[reference table](#ideviceservice-reference) below:
 
 ```csharp
 // Two DeviceMap<TDevice> instances mapping the same device model, keyed to tell them apart
@@ -139,7 +145,19 @@ entity's current (converted) state as their argument, and is likewise completed 
 
 ## The `As*()` terminals
 
-Each `Map(...)` overload exposes a subset of these, matching what makes sense for the mapped member's type:
+Each `Map(...)` overload exposes a subset of these, matching what makes sense for the mapped member's type.
+
+| Terminal | HA domain | Device class | Extra chained calls | Backed by |
+|---|---|---|---|---|
+| `AsSensor()` | `sensor` | none | `WithId(int)` | property |
+| `AsBinarySensor()` | `binary_sensor` | none | `WithId(int)` | property |
+| `AsSwitch()` | `switch` | none | `InitiallyOn()` / `InitiallyOff()` | property |
+| `AsTemperatureSensor()` | `sensor` | `temperature` (°C, thermometer icon) | `WithId(int)` | property |
+| `AsTimestamp()` | `sensor` | `timestamp` | `WithId(int)` | property |
+| `AsButton()` | `button` | none | — | parameterless method |
+| `AsTemplateSensor()` | `sensor` or `binary_sensor` (inferred from the method's return type) | none | `TriggeredBy(...)` / `Triggered.By(...)`, `StableForSeconds(int)`, `GetFullEntityId()` | method |
+
+Detail on each, with examples:
 
 - **`AsSensor()`** - a plain HA `sensor`, no device class.
 
@@ -202,10 +220,7 @@ Each `Map(...)` overload exposes a subset of these, matching what makes sense fo
   The HA domain (`sensor` vs. `binary_sensor`) is inferred from the mapped method's return type: `bool`/
   `bool?` becomes `binary_sensor`, everything else becomes `sensor`.
 
-`AsSensor()`/`AsTemperatureSensor()`/`AsTimestamp()`/`AsBinarySensor()` all support `WithId(int sensorId)`,
-which tags the sensor with an external numeric data point id so that
-`IDeviceService.Update(IEnumerable<IIdValue> dataPoints)` can route an externally-sourced value to the
-right sensor without needing to know its HA entity id.
+(`WithId` is covered in [Shared chain methods](#shared-chain-methods-withfriendlyname-withicon-withid) above.)
 
 ## Template sensor triggers and `StableForSeconds`
 
@@ -246,10 +261,13 @@ trigger of the next, as shown above (`max_up` -> `max_up_stable` -> `level_float
 A template sensor's computed value that is `null` or blank disables the entity (marks it unavailable in
 HA) rather than publishing an empty state.
 
-## Shared attributes: `WithFriendlyName` and `WithIcon`
+## Shared chain methods: `WithFriendlyName`, `WithIcon`, `WithId`
 
-Available on every `Map(...)` root (chain them before the terminal `As*()` call) and on the device itself
-(after `AsDevice(...)`):
+| Method | Chain it on | What it does |
+|---|---|---|
+| `WithFriendlyName(string)` | `AsDevice(...)` return value, or any `Map(...)` root (before the terminal `As*()` call) | Sets the display name shown in Home Assistant, for the device or the entity respectively. |
+| `WithIcon(MaterialIconKind)` | Any `Map(...)` root (before the terminal `As*()` call) | Sets the entity's icon, rendered to the `mdi:...` string HA expects. `AsTemperatureSensor()` sets its own thermometer icon unconditionally, so `WithIcon` chained before it has no visible effect there — use it on the other terminals, which don't set one of their own. |
+| `WithId(int sensorId)` | The terminal itself — `AsSensor()`, `AsBinarySensor()`, `AsTemperatureSensor()`, or `AsTimestamp()` (the four built on `SensorMapRoot<TMap>`; **not** `AsSwitch()`, `AsButton()`, or `AsTemplateSensor()`) | Tags the sensor with an external numeric data point id, so [`IDeviceService.Update(IEnumerable<IIdValue>)`](#ideviceservice-reference) can route an externally-sourced value to the right sensor without needing to know its HA entity id — see [`IDeviceService.GetSensorIds`](#ideviceservice-reference) to read the ids back. |
 
 ```csharp
 AsDevice("tank_nd")
@@ -260,12 +278,11 @@ Map(x => x.OverloadUp(), "overload_up")
     .WithIcon(MaterialIconKind.Water)  // any Material.Icons.MaterialIconKind value
     .AsTemplateSensor()
     .TriggeredBy(entities.BinarySensor.SomeUpstreamSensor);
-```
 
-`WithIcon` takes a `Material.Icons.MaterialIconKind` and renders it to the `mdi:...` string HA expects.
-`AsTemperatureSensor()` sets its own thermometer icon unconditionally, so a `WithIcon` call chained before
-it has no visible effect on that particular terminal - use `WithIcon` for the other terminals, which don't
-set one of their own.
+Map(x => x.ModeId, "mode_id")
+    .AsSensor()
+    .WithId(92);  // chained on the terminal, not on the Map(...) root
+```
 
 ## Wiring the library into a host
 
@@ -303,6 +320,27 @@ services.Scan(scan => scan
 A `DeviceMap<TDevice>` subclass implements `IDeviceMap`, which extends this library's `IScopedService` - so
 as long as the assembly containing it is included in that scan, it is resolvable by
 `IDeviceService.Init<TMap>()` with no further registration.
+
+## `IDeviceService` reference
+
+Everything an app calls at runtime, after a `DeviceMap<TDevice>` has been declared. "Non-keyed" members
+address the single `AsDevice(identifier)` instance of `TDevice`; `*Keyed` members address one of several
+`AsDevice(identifier, key)` instances by `key`.
+
+| Member | Keyed? | What it does |
+|---|---|---|
+| `Init<TMap>()` | — | Resolves `TMap` from DI and initializes its device. A no-op if the device (or device/key pair) is already registered. Call once, typically from `IAsyncInitializable.InitializeAsync`. |
+| `InitFromMap<TMap>(TMap map)` | — | Same as `Init<TMap>()`, but initializes an already-constructed map instance instead of resolving one from DI. |
+| `GetSensorIds<TDevice>()` | both (two overloads; keyed takes `object key`) | Returns the external numeric sensor ids declared via `WithId(int)` for the registered device. |
+| `Update<TDevice>(IEnumerable<IIdValue> dataPoints)` | `UpdateKeyed<TDevice>(object key, IEnumerable<IIdValue> dataPoints)` | Routes each externally-sourced value in `dataPoints` to the sensor declared with the matching `WithId` id. |
+| `Update<TDevice>()` | *(no keyed overload — use `UpdateKeyedFromModel`)* | Resolves the device model from DI and recomputes every sensor's value directly from it. |
+| `UpdateFromModel<TDevice>(TDevice device)` | `UpdateKeyedFromModel<TDevice>(object key, TDevice device)` | Recomputes every sensor's value from the given device model instance, without resolving one from DI. |
+| `Disable<TDevice>()` | `DisableKeyed<TDevice>(object key)` | Marks all of the device's entities unavailable in HA. |
+| `Enable<TDevice>()` | `EnableKeyed<TDevice>(object key)` | Marks all of the device's entities available in HA. |
+| `EnsureEnabled<TDevice>()` | *(no keyed overload)* | Enables the device only if it is currently disabled; otherwise does nothing. |
+
+All `TDevice` type parameters are constrained to `class`. None of these need the device's `DeviceMap<TDevice>`
+passed back in — only the device model type (and, for keyed devices, the key used in `AsDevice(identifier, key)`).
 
 ## Requirements
 
