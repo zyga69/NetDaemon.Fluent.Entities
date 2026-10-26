@@ -3,6 +3,11 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Local overrides with real credentials (HA token, MQTT broker password, ...).
+# appsettings.json itself stays tracked with placeholder values only.
+appsettings.Development.json
+appsettings.*.Development.json
+
 # dotenv files
 .env
 

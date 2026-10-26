@@ -26,6 +26,12 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <!-- Gitignored local override with real HA/MQTT credentials; loaded automatically by
+         Host.CreateDefaultBuilder when DOTNET_ENVIRONMENT=Development. Absent on a clean clone. -->
+    <None Update="appsettings.Development.json" Condition="Exists('appsettings.Development.json')">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
