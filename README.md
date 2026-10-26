@@ -286,8 +286,38 @@ Map(x => x.ModeId, "mode_id")
 
 ## Wiring the library into a host
 
-`NetDaemon.Fluent.Entities` registers its own services through two extension methods that a consuming host
-must call once, alongside its own DI setup:
+One call:
+
+```csharp
+services.AddFluentEntities(Assembly.GetExecutingAssembly());
+```
+
+`AddFluentEntities` registers everything: the built-in entity initializers and type converters, the
+library's own internal services, and - by scanning the assemblies you pass in - every
+`DeviceMap<TDevice>` subclass you've declared **and its device model type**, so `Tank`/`SampleDevice`/
+whatever your model classes are called resolve with no further registration, whether their map used
+`AsDevice(identifier)` or the keyed `AsDevice(identifier, key)` overload. Pass every assembly that
+contains a `DeviceMap<TDevice>` subclass (usually just your own, i.e. `Assembly.GetExecutingAssembly()`
+from your host project, but add more if your maps are spread across several assemblies).
+
+That's it for the common case. The three things it does, if you want the detail:
+
+1. Calls `AddEntityInitializers()` and `AddTypeConverters()` (see below - still public on their own, in
+   case you want to call them without the rest).
+2. Registers the library's own internal services directly (`DeviceService`, `EntityService`,
+   `DeviceRegistry`, and the rest) — no reflection, no third-party scanning library required.
+3. Scans the assemblies you passed in for `IDeviceMap` subclasses, registers each one as scoped, and
+   auto-registers each one's device model type both as a plain scoped service and as a service keyed to
+   [`KeyedService.AnyKey`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.keyedservice.anykey) —
+   a wildcard that satisfies a keyed resolution for any key, which is what lets a keyed device's model
+   resolve without this method ever needing to know the actual key value (it can't — that value is only
+   set once the map's own constructor runs, well after `AddFluentEntities` has already returned).
+
+### Advanced: wiring it by hand
+
+`AddEntityInitializers()` and `Converters.RegistrationsExtensions.AddTypeConverters()` stay public and
+unchanged, for hosts that already have their own generic-service-scanning setup (keyed by their own marker
+interfaces, say) and would rather fold this library into that instead of calling `AddFluentEntities`:
 
 ```csharp
 services
@@ -302,44 +332,12 @@ services
   `DateTime`) as scoped services keyed by the CLR type they convert, so sensor/template-sensor values of any
   of those types can be converted to/from MQTT sensor strings.
 
-Beyond those two calls, the library's own services - `DeviceService`, `EntityService`, `DeviceRegistry`,
-and every `DeviceMap<TDevice>` subclass - are discovered by marking them with the library's own DI marker
-interfaces, `NetDaemon.Fluent.Entities.DependencyInjection.ISingleService` (singleton) and `IScopedService`
-(scoped), and having the host's own DI container scan (e.g. via [Scrutor](https://github.com/khellang/Scrutor))
-register anything assignable to them. This needs **both** the library's assembly (`DeviceService` etc. live
-there) **and** your own app's assembly (your `DeviceMap<TDevice>` subclasses live there) — and since those
-library services are `internal`, the scan needs `publicOnly: false`, or they're silently skipped:
-
-```csharp
-var libraryAssembly = typeof(IDeviceService).Assembly;
-var appAssembly = Assembly.GetExecutingAssembly();
-
-services.Scan(scan => scan
-    .FromAssemblies(libraryAssembly, appAssembly)
-    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.ISingleService>(), publicOnly: false)
-        .AsImplementedInterfaces().AsSelf().WithSingletonLifetime()
-    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.IScopedService>(), publicOnly: false)
-        .AsImplementedInterfaces().AsSelf().WithScopedLifetime());
-```
-
-A `DeviceMap<TDevice>` subclass implements `IDeviceMap`, which extends this library's `IScopedService` - so
-as long as its assembly is included in that scan, it is resolvable by `IDeviceService.Init<TMap>()`.
-
-**The device model itself also needs to be a registered service** — this is easy to miss, since nothing
-above registers it. `IDeviceService` resolves `TDevice` with a plain `GetRequiredService(typeof(TDevice))`
-whenever a template sensor recomputes its value (not just when the map is resolved), so register it
-explicitly:
-
-```csharp
-services.AddScoped<Tank>();  // or whatever your device model class is
-```
-
-For a keyed device (`AsDevice(identifier, key)`), register it as a keyed service instead, keyed by the same
-value passed to `AsDevice`:
-
-```csharp
-services.AddKeyedScoped<VitotrolCircuit>(VitotrolGroup.Radiators);
-```
+Taking this path means you're on your own for the three things `AddFluentEntities` otherwise handles:
+registering the library's own internal services (marked with this library's DI marker interfaces,
+`NetDaemon.Fluent.Entities.DependencyInjection.ISingleService`/`IScopedService`, if your scan can use them),
+registering every `DeviceMap<TDevice>` subclass, and registering every device model type — including the
+`KeyedService.AnyKey` trick above for keyed devices, which is easy to miss since nothing else will tell you
+it's needed until a template sensor fails to resolve its device at runtime.
 
 ## `IDeviceService` reference
 
