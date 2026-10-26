@@ -13,7 +13,6 @@
     <PackageReference Include="NetDaemon.Extensions.Scheduling" />
     <PackageReference Include="NetDaemon.HassModel" />
     <PackageReference Include="NetDaemon.Runtime" />
-    <PackageReference Include="Scrutor" />
     <PackageReference Include="Serilog.Extensions.Hosting" />
     <PackageReference Include="Serilog.Sinks.Console" />
   </ItemGroup>
