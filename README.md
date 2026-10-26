@@ -303,23 +303,43 @@ services
   of those types can be converted to/from MQTT sensor strings.
 
 Beyond those two calls, the library's own services - `DeviceService`, `EntityService`, `DeviceRegistry`,
-every `DeviceMap<TDevice>` subclass, and the few services above - are discovered by marking them with the
-library's own DI marker interfaces, `NetDaemon.Fluent.Entities.DependencyInjection.ISingleService` (singleton)
-and `IScopedService` (scoped), and having the host's own DI container scan (e.g. via
-[Scrutor](https://github.com/khellang/Scrutor)) register anything assignable to them:
+and every `DeviceMap<TDevice>` subclass - are discovered by marking them with the library's own DI marker
+interfaces, `NetDaemon.Fluent.Entities.DependencyInjection.ISingleService` (singleton) and `IScopedService`
+(scoped), and having the host's own DI container scan (e.g. via [Scrutor](https://github.com/khellang/Scrutor))
+register anything assignable to them. This needs **both** the library's assembly (`DeviceService` etc. live
+there) **and** your own app's assembly (your `DeviceMap<TDevice>` subclasses live there) — and since those
+library services are `internal`, the scan needs `publicOnly: false`, or they're silently skipped:
 
 ```csharp
+var libraryAssembly = typeof(IDeviceService).Assembly;
+var appAssembly = Assembly.GetExecutingAssembly();
+
 services.Scan(scan => scan
-    .FromAssemblies(assembly)
-    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.ISingleService>())
+    .FromAssemblies(libraryAssembly, appAssembly)
+    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.ISingleService>(), publicOnly: false)
         .AsImplementedInterfaces().AsSelf().WithSingletonLifetime()
-    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.IScopedService>())
+    .AddClasses(c => c.AssignableTo<NetDaemon.Fluent.Entities.DependencyInjection.IScopedService>(), publicOnly: false)
         .AsImplementedInterfaces().AsSelf().WithScopedLifetime());
 ```
 
 A `DeviceMap<TDevice>` subclass implements `IDeviceMap`, which extends this library's `IScopedService` - so
-as long as the assembly containing it is included in that scan, it is resolvable by
-`IDeviceService.Init<TMap>()` with no further registration.
+as long as its assembly is included in that scan, it is resolvable by `IDeviceService.Init<TMap>()`.
+
+**The device model itself also needs to be a registered service** — this is easy to miss, since nothing
+above registers it. `IDeviceService` resolves `TDevice` with a plain `GetRequiredService(typeof(TDevice))`
+whenever a template sensor recomputes its value (not just when the map is resolved), so register it
+explicitly:
+
+```csharp
+services.AddScoped<Tank>();  // or whatever your device model class is
+```
+
+For a keyed device (`AsDevice(identifier, key)`), register it as a keyed service instead, keyed by the same
+value passed to `AsDevice`:
+
+```csharp
+services.AddKeyedScoped<VitotrolCircuit>(VitotrolGroup.Radiators);
+```
 
 ## `IDeviceService` reference
 
