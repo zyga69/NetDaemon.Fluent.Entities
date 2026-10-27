@@ -12,13 +12,14 @@ namespace NetDaemon.Fluent.Entities.Initializers
     /// <summary>
     /// <see cref="IEntityInitializer"/> for <see cref="SwitchDefinition"/>: creates the HA <c>switch</c> entity,
     /// publishes its initial state, and subscribes to its MQTT command topic so toggling it in HA writes the
-    /// new state back through MQTT (the device model property itself is not updated by this service).
+    /// new state back through MQTT and onto the bound device model property.
     /// </summary>
     /// <param name="_entityService">Creates/enables the underlying MQTT entity.</param>
     /// <param name="_entityManager">The NetDaemon MQTT entity manager used to subscribe to and publish switch state.</param>
-    /// <param name="_converterFactory">Resolves the <see cref="ITypeConverter"/> for <see cref="bool"/>, used to render the initial state.</param>
+    /// <param name="_converterFactory">Resolves the <see cref="ITypeConverter"/> for <see cref="bool"/>, used to render the initial state and parse incoming commands.</param>
+    /// <param name="_serviceProvider">Resolves the device model instance the switch property is written onto.</param>
     /// <param name="logger">The Serilog logger.</param>
-    internal class SwitchService(IEntityService _entityService, IMqttEntityManager _entityManager, IConverterFactory _converterFactory, Serilog.ILogger logger) : ISwitchService
+    internal class SwitchService(IEntityService _entityService, IMqttEntityManager _entityManager, IConverterFactory _converterFactory, IServiceProvider _serviceProvider, Serilog.ILogger logger) : ISwitchService
     {
         private readonly Serilog.ILogger _logger = logger.ForContext<SwitchService>();
         private readonly ITypeConverter _typeConverter = _converterFactory.GetService<bool>();
@@ -30,7 +31,7 @@ namespace NetDaemon.Fluent.Entities.Initializers
         /// Creates the switch entity, subscribes to its command topic, and publishes <see cref="SwitchDefinition.InitialState"/>.
         /// </summary>
         /// <param name="sensorDefinition">The entity definition; must be a <see cref="SwitchDefinition"/>.</param>
-        /// <param name="deviceDefinition">The owning device definition.</param>
+        /// <param name="deviceDefinition">The owning device definition, used to resolve the device model instance.</param>
         /// <exception cref="ArgumentException">Thrown when <paramref name="sensorDefinition"/> is not a <see cref="SwitchDefinition"/>.</exception>
         public async Task InitWithDevice(EntityDefinition sensorDefinition, DeviceDefinition deviceDefinition)
         {
@@ -52,6 +53,13 @@ namespace NetDaemon.Fluent.Entities.Initializers
 
             var subscription = commandSubscription.Subscribe(async state =>
            {
+               var convertedValue = _typeConverter.FromSensorString(state);
+               if (convertedValue != null)
+               {
+                   var device = _serviceProvider.GetDevice(deviceDefinition);
+                   switchDefinition.Property.SetValue(device, convertedValue);
+               }
+
                await _entityManager.SetStateAsync(switchDefinition.EntityId, state);
            });
 
