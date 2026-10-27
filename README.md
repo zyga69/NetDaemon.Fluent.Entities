@@ -6,8 +6,7 @@
 [![codecov](https://codecov.io/gh/zyga69/NetDaemon.Fluent.Entities/branch/main/graph/badge.svg)](https://codecov.io/gh/zyga69/NetDaemon.Fluent.Entities)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> An unofficial, community-maintained extension for [NetDaemon](https://netdaemon.xyz/) — not affiliated
-> with, endorsed by, or published by the NetDaemon project.
+> An unofficial, community-maintained extension for [NetDaemon](https://netdaemon.xyz/)
 
 A fluent device/entity mapping framework for NetDaemon apps. It sits on top of `IMqttEntityManager` and
 lets an app describe a device model's properties and methods as Home Assistant entities, declaratively,
