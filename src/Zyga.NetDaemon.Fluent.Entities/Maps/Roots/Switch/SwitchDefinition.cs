@@ -5,7 +5,7 @@ namespace NetDaemon.Fluent.Entities.Maps.Roots.Switch
     /// <summary>
     /// Describes a HA <c>switch</c> entity backed by a <see cref="bool"/> property on the device model.
     /// <c>SwitchService</c> subscribes to the entity's HA commands and writes the resulting state back
-    /// through MQTT; it does not currently write the value back onto the device model property.
+    /// through MQTT as well as onto <see cref="Property"/> on the device model instance.
     /// </summary>
     /// <param name="shortEntityId">The short (unprefixed) entity id, or a fully qualified one matching <paramref name="prefix"/>.</param>
     /// <param name="prefix">The HA domain prefix, typically <c>switch</c>.</param>

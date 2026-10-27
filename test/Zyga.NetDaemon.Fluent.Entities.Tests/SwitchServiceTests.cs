@@ -26,6 +26,7 @@ namespace NetDaemon.Fluent.Entities.Tests
         private readonly IMqttEntityManager _entityManager;
         private readonly IConverterFactory _converterFactory;
         private readonly ITypeConverter _typeConverter;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger _logger;
 
         private readonly SwitchService _switchService;
@@ -37,12 +38,13 @@ namespace NetDaemon.Fluent.Entities.Tests
             _converterFactory = Substitute.For<IConverterFactory>();
             _typeConverter = Substitute.For<ITypeConverter>();
             _converterFactory.GetService<bool>().Returns(_typeConverter);
+            _serviceProvider = Substitute.For<IServiceProvider>();
             _logger = Substitute.For<ILogger>();
             _logger.ForContext<SwitchService>().Returns(_logger);
 
             // SwitchService resolves its converter eagerly in its primary constructor, so the stub above
             // must be set up before this call.
-            _switchService = new SwitchService(_entityService, _entityManager, _converterFactory, _logger);
+            _switchService = new SwitchService(_entityService, _entityManager, _converterFactory, _serviceProvider, _logger);
         }
 
         /// <summary>Builds a map with a single device and a single bool-backed switch, mirroring the fluent API usage shown in DeviceMapTests.</summary>
@@ -141,8 +143,10 @@ namespace NetDaemon.Fluent.Entities.Tests
         public async Task InitWithDevice_WhenCommandReceived_RepublishesReceivedStateAsIs()
         {
             var (map, definition, _) = BuildMap();
+            var device = new SwitchServiceTestDevice();
 
             _typeConverter.ToSensorString(false).Returns("OFF");
+            _serviceProvider.GetService(typeof(SwitchServiceTestDevice)).Returns(device);
             var subject = new Subject<string>();
             _entityManager.PrepareCommandSubscriptionAsync(definition.EntityId)
                 .Returns(Task.FromResult<IObservable<string>>(subject));
@@ -152,6 +156,46 @@ namespace NetDaemon.Fluent.Entities.Tests
             subject.OnNext("ON");
 
             await _entityManager.Received(1).SetStateAsync(definition.EntityId, "ON");
+        }
+
+        [Fact]
+        public async Task InitWithDevice_WhenCommandReceived_WritesConvertedValueOntoDeviceModelProperty()
+        {
+            var (map, definition, _) = BuildMap();
+            var device = new SwitchServiceTestDevice { IsOn = false };
+
+            _typeConverter.ToSensorString(false).Returns("OFF");
+            _typeConverter.FromSensorString("ON").Returns(true);
+            _serviceProvider.GetService(typeof(SwitchServiceTestDevice)).Returns(device);
+            var subject = new Subject<string>();
+            _entityManager.PrepareCommandSubscriptionAsync(definition.EntityId)
+                .Returns(Task.FromResult<IObservable<string>>(subject));
+
+            await _switchService.InitWithDevice(definition, map.Definition);
+
+            subject.OnNext("ON");
+
+            Assert.True(device.IsOn);
+        }
+
+        [Fact]
+        public async Task InitWithDevice_WhenCommandCannotBeConverted_LeavesDeviceModelPropertyUnchanged()
+        {
+            var (map, definition, _) = BuildMap();
+            var device = new SwitchServiceTestDevice { IsOn = false };
+
+            _typeConverter.ToSensorString(false).Returns("OFF");
+            _typeConverter.FromSensorString("not-a-bool").Returns((object?)null);
+            _serviceProvider.GetService(typeof(SwitchServiceTestDevice)).Returns(device);
+            var subject = new Subject<string>();
+            _entityManager.PrepareCommandSubscriptionAsync(definition.EntityId)
+                .Returns(Task.FromResult<IObservable<string>>(subject));
+
+            await _switchService.InitWithDevice(definition, map.Definition);
+
+            subject.OnNext("not-a-bool");
+
+            Assert.False(device.IsOn);
         }
 
         [Fact]
