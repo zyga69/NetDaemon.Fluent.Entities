@@ -40,7 +40,7 @@
   <ItemGroup Label="Sample">
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     <PackageVersion Include="NetDaemon.AppModel" Version="26.36.0" />
-    <PackageVersion Include="NetDaemon.Extensions.Scheduling" Version="26.36.0" />
+    <PackageVersion Include="NetDaemon.Extensions.Scheduling" Version="26.43.1" />
     <PackageVersion Include="NetDaemon.Runtime" Version="26.36.0" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
   </ItemGroup>
